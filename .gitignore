@@ -15,7 +15,7 @@
 /init_dataset_txt/
 /third_party/
 /weights/
-
+/my_experiment/
 
 ### CMake ###
 CMakeCache.txt

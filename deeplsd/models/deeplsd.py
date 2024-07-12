@@ -9,6 +9,9 @@ import torch.nn.functional as F
 
 from .base_model import BaseModel
 from .backbones.vgg_unet import VGGUNet
+from .backbones.squeezenet import SqueezeNet
+from .backbones.squeezeunet import SqueezeUNet
+
 from ..geometry.line_utils import (merge_lines, get_line_orientation,
                                    filter_outlier_lines)
 from ..geometry.homography_adaptation import torch_homography_adaptation
@@ -19,7 +22,7 @@ from line_refinement import line_optim
 
 class DeepLSD(BaseModel):
     default_conf = {
-        'tiny': False,
+        'tiny': True,
         'sharpen': True,
         'line_neighborhood': 5,
         'loss_weights': {
@@ -46,9 +49,13 @@ class DeepLSD(BaseModel):
 
     def _init(self, conf):
         # Base network
-        self.backbone = VGGUNet(tiny=self.conf.tiny)
-        dim = 32 if self.conf.tiny else 64
+        #self.backbone = SqueezeNet()
+        #dim = 10
+        #self.backbone = VGGUNet(tiny=self.conf.tiny)
+        #dim = 32 if self.conf.tiny else 64
 
+        self.backbone = SqueezeUNet()
+        dim = 32    
         # Predict the distance field and angle to the nearest line
         # DF head
         self.df_head = nn.Sequential(

@@ -7,7 +7,7 @@ data:
     seed: 0
 model:
     name: deeplsd
-    tiny: False
+    tiny: True
     sharpen: True
     line_neighborhood: 5
     loss_weights:

@@ -3,8 +3,8 @@ data:
     dataset_dir: Wireframe_raw
     gt_dir: export_datasets/wireframe_ha5
     val_size: 500
-    batch_size: 5  # 10
-    resize: [333, 333]
+    batch_size: 2 # 10
+    resize: [333, 333]  #333*333
     num_workers: 4
     photometric_augmentation:
         enable: True
@@ -30,7 +30,7 @@ data:
     seed: 0
 model:
     name: deeplsd
-    tiny: False
+    tiny: True
     sharpen: True
     line_neighborhood: 5
     loss_weights:

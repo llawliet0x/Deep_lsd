@@ -12,6 +12,8 @@ from .backbones.vgg_unet import VGGUNet
 from ..geometry.line_utils import merge_lines, filter_outlier_lines
 from ..utils.tensor import preprocess_angle
 from pytlsd import lsd
+from .backbones.squeezenet import SqueezeNet
+from .backbones.squeezeunet import SqueezeUNet
 
 
 class DeepLSD(BaseModel):
@@ -31,8 +33,10 @@ class DeepLSD(BaseModel):
 
     def _init(self, conf):
         # Base network
-        self.backbone = VGGUNet(tiny=False)
-        dim = 64
+        #self.backbone = VGGUNet(tiny=True)
+        #self.backbone = SqueezeNet()
+        self.backbone = SqueezeUNet()
+        dim = 32
 
         # Predict the distance field and angle to the nearest line
         # DF head
@@ -72,31 +76,76 @@ class DeepLSD(BaseModel):
     def _forward(self, data):
         outputs = {}
 
-        if self.conf.multiscale:
-            outputs = self.ms_forward(data)
-        else:
-            base = self.backbone(data['image'])
+        #if self.conf.multiscale:
+        #    outputs = self.ms_forward(data)
+        #else:
+        base = self.backbone(data['image'])
 
-            # DF prediction
-            outputs['df_norm'] = self.df_head(base).squeeze(1)
-            outputs['df'] = self.denormalize_df(outputs['df_norm'])
+        # DF prediction
+        outputs['df_norm'] = self.df_head(base).squeeze(1)
+        outputs['df'] = self.denormalize_df(outputs['df_norm'])
 
             # Closest line direction prediction
-            outputs['line_level'] = self.angle_head(base).squeeze(1) * np.pi
+        outputs['line_level'] = self.angle_head(base).squeeze(1) * np.pi
 
         # Detect line segments
-        if self.conf.detect_lines:
-            lines = []
-            np_img = (data['image'].cpu().numpy()[:, 0] * 255).astype(np.uint8)
-            np_df = outputs['df'].cpu().numpy()
-            np_ll = outputs['line_level'].cpu().numpy()
-            for img, df, ll in zip(np_img, np_df, np_ll):
-                line = self.detect_afm_lines(
-                    img, df, ll, **self.conf.line_detection_params)
-                lines.append(line)
-            outputs['lines'] = lines
+        #if self.conf.detect_lines:
+        lines = []
+        np_img = (data['image'].cpu().detach().numpy()[:, 0] * 255).astype(np.uint8)
+        np_df = outputs['df'].cpu().detach().numpy()
+        np_ll = outputs['line_level'].cpu().detach().numpy()
+        for img, df, ll in zip(np_img, np_df, np_ll):
+            line = self.detect_afm_lines(
+                img, df, ll, **self.conf.line_detection_params)
+            lines.append(line)
+        outputs['lines'] = lines
 
+        #x = torch.tensor(outputs['lines'])
+
+        #max_length = max(len(line) for line in lines)
+        #padded_lines = [line + [[0, 0]] * (max_length - len(line)) for line in lines]  # 使用零填充
+        #lines_tensor = torch.tensor(padded_lines, dtype=torch.float, device=data['image'].device)
         return outputs
+        #return outputs
+   # def _forward(self, image):
+        if self.conf.multiscale:
+            outputs = self.ms_forward({'image': image})
+        else:
+            base = self.backbone(image)
+
+            # DF prediction
+            df_norm = self.df_head(base).squeeze(1)
+            df = self.denormalize_df(df_norm)
+
+            # Closest line direction prediction
+            line_level = self.angle_head(base).squeeze(1) * np.pi
+
+        # Detect line segments
+        lines = []
+        if self.conf.detect_lines:
+            img = (image[:, 0] * 255).byte()  # Convert to uint8 tensor
+            df = df
+            ll = line_level
+            for i in range(img.size(0)):
+                img_np = img[i].cpu().detach().numpy()
+                df_np = df[i].cpu().detach().numpy()
+                ll_np = ll[i].cpu().detach().numpy()
+                line = self.detect_afm_lines(
+                    img_np, df_np, ll_np, **self.conf.line_detection_params)
+                lines.append(torch.tensor(line, dtype=torch.float, device=image.device))
+
+        # 将 lines 列表转换为张量
+        if lines:
+            max_length = max(len(line) for line in lines)
+            padded_lines = [torch.cat([line, torch.zeros((max_length - line.size(0), 2), device=image.device)], dim=0) for line in lines]
+            lines_tensor = torch.stack(padded_lines)
+        else:
+            lines_tensor = torch.empty((0, max_length, 2), dtype=torch.float, device=image.device)
+
+        return lines_tensor
+
+
+
 
     def ms_forward(self, data):     #
         """ Do several forward passes at multiple image resolutions

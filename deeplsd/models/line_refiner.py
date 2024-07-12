@@ -11,6 +11,8 @@ from omegaconf import OmegaConf
 
 from .base_model import BaseModel
 from .backbones.vgg_unet import VGGUNet
+from .backbones.squeezenet import SqueezeNet
+from .backbones.squeezeunet import SqueezeUNet
 from ..geometry.line_utils import get_line_orientation, filter_outlier_lines
 from ..utils.tensor import preprocess_angle
 from line_refinement import line_optim
@@ -18,7 +20,7 @@ from line_refinement import line_optim
 
 class LineRefiner(BaseModel):
     default_conf = {
-        'tiny': False,
+        'tiny': True,
         'sharpen': True,
         'line_neighborhood': 5,
         'line_detection_params': {
@@ -39,9 +41,13 @@ class LineRefiner(BaseModel):
 
     def _init(self, conf):
         # Base network
-        self.backbone = VGGUNet(tiny=self.conf.tiny)
-        dim = 32 if self.conf.tiny else 64
+        #self.backbone = SqueezeNet()
+        #dim = 10
+        #self.backbone = VGGUNet(tiny=self.conf.tiny)
+        #dim = 32 if self.conf.tiny else 64
 
+        self.backbone = SqueezeUNet()
+        dim = 32
         # Predict the distance field and angle to the nearest line
         # DF head
         self.df_head = nn.Sequential(
